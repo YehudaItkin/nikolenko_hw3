@@ -1,12 +1,39 @@
 # Custom dataset
-from PIL import Image
-import torch.utils.data as data
+import glob
 import os
 import random
 
+import torch.utils.data as data
+import torchvision.transforms as transforms
+from PIL import Image
+from torch.utils.data import Dataset
+
+
+class ImageDataset(Dataset):
+    def __init__(self, root, transforms_=None, unaligned=False, mode='train'):
+        self.transform = transforms.Compose(transforms_)
+        self.unaligned = unaligned
+
+        self.files_A = sorted(glob.glob(os.path.join(root, '%s/A' % mode) + '/*.*'))
+        self.files_B = sorted(glob.glob(os.path.join(root, '%s/B' % mode) + '/*.*'))
+
+    def __getitem__(self, index):
+        item_A = self.transform(Image.open(self.files_A[index % len(self.files_A)]))
+
+        if self.unaligned:
+            item_B = self.transform(Image.open(self.files_B[random.randint(0, len(self.files_B) - 1)]))
+        else:
+            item_B = self.transform(Image.open(self.files_B[index % len(self.files_B)]))
+
+        return {'A': item_A, 'B': item_B}
+
+    def __len__(self):
+        return max(len(self.files_A), len(self.files_B))
+
 
 class DatasetFromFolder(data.Dataset):
-    def __init__(self, image_dir, subfolder='train', direction='AtoB', transform=None, resize_scale=None, crop_size=None, fliplr=False):
+    def __init__(self, image_dir, subfolder='train', direction='AtoB', transform=None, resize_scale=None,
+                 crop_size=None, fliplr=False):
         super(DatasetFromFolder, self).__init__()
         self.input_path = os.path.join(image_dir, subfolder)
         self.image_filenames = [x for x in sorted(os.listdir(self.input_path))]
